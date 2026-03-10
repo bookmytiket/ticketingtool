@@ -329,7 +329,7 @@ export const TicketDetail = () => {
   const handleAssigneeChange = async (e) => {
     const newAssignee = e.target.value || null
     try {
-      const updatedTicket = await ticketsAPI.update(id, { assignee: newAssignee })
+      const updatedTicket = await ticketsAPI.update(id, { assignedTo: newAssignee })
       setTicket(updatedTicket)
       toast.success(newAssignee ? 'Ticket assigned successfully' : 'Ticket unassigned')
     } catch (error) {
@@ -587,13 +587,13 @@ export const TicketDetail = () => {
                         ))}
                       </select>
                       <p className="text-[10px] text-gray-400">
-                        {`Current: ${ticket.assignee?.name || 'Unassigned'}`}
+                        {`Current: ${ticket.assignee?.name || assignees.find(a => (a._id || a.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned'}`}
                       </p>
                     </div>
                   ) : (
                     <div className="flex items-center space-x-1">
                       <User size={12} className="text-gray-400" />
-                      <p className="text-gray-900 text-xs">{ticket.assignee?.name || 'Unassigned'}</p>
+                      <p className="text-gray-900 text-xs">{ticket.assignee?.name || assignees.find(a => (a._id || a.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned'}</p>
                     </div>
                   )}
                 </div>
@@ -693,6 +693,7 @@ export const TicketDetail = () => {
                 <div>
                   <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide block mb-1">Created By</label>
                   <p className="text-gray-900 text-xs">{ticket.creator?.name || 'Unknown'}</p>
+                  <p className="text-[10px] text-gray-500">{ticket.creator?.email || ticket.userId || ''}</p>
                 </div>
               </div>
             </Card>

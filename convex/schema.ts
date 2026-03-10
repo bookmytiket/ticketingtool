@@ -39,7 +39,8 @@ export default defineSchema({
         status: v.string(), // open, in-progress, resolved, closed
         priority: v.string(), // low, medium, high, urgent
         userId: v.id("users"), // creator
-        assignedTo: v.optional(v.id("users")), // technician
+        assignedTo: v.optional(v.union(v.id("users"), v.null())), // technician
+        approvedBy: v.optional(v.id("users")), // user who approved/rejected
         organizationId: v.id("organizations"),
         categoryId: v.optional(v.id("categories")),
         departmentId: v.optional(v.id("departments")),

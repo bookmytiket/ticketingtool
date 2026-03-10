@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Select } from '../../components/ui/Select'
 import { Plus, Search, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
-import { ticketsAPI, departmentsAPI } from '../../services/api'
+import { ticketsAPI, departmentsAPI, usersAPI, categoriesAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -23,6 +23,8 @@ export const TicketList = () => {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
   const [departments, setDepartments] = useState([])
+  const [users, setUsers] = useState([])
+  const [categories, setCategories] = useState([])
   const navigate = useNavigate()
   const isAdmin = user?.role === 'admin' || user?.role === 'technician'
 
@@ -38,12 +40,12 @@ export const TicketList = () => {
     }
   }, [searchParams])
 
-  // Load departments for admins/agents
+  // Load departments, users, and categories
   useEffect(() => {
-    if (isAdmin) {
-      loadDepartments()
-    }
-  }, [isAdmin])
+    loadDepartments()
+    loadUsers()
+    loadCategories()
+  }, [])
 
   // Debounce search term to avoid too many API calls
   useEffect(() => {
@@ -65,6 +67,26 @@ export const TicketList = () => {
       setDepartments(data || [])
     } catch (error) {
       console.error('Failed to load departments', error)
+    }
+  }
+
+  const loadUsers = async () => {
+    try {
+      const data = await usersAPI.getAll()
+      setUsers(data || [])
+    } catch (error) {
+      console.error('Failed to load users', error)
+      toast.error('Failed to load user directory for names. Please refresh.')
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const data = await categoriesAPI.getAll()
+      setCategories(data || [])
+    } catch (error) {
+      console.error('Failed to load categories', error)
+      toast.error('Failed to load categories. Please refresh.')
     }
   }
 
@@ -306,7 +328,7 @@ export const TicketList = () => {
                             </td>
                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                               <span className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
-                                {ticket.category || '—'}
+                                {ticket.categoryDetails?.name || categories.find(c => (c._id || c.id) === ticket.categoryId)?.name || ticket.category || '—'}
                               </span>
                             </td>
                             <td className="px-2 py-2 whitespace-nowrap text-center align-middle">
@@ -324,8 +346,8 @@ export const TicketList = () => {
                               </div>
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-900 align-middle">
-                              <div className="max-w-[100px] truncate" title={ticket.assignee?.name || 'Unassigned'}>
-                                {ticket.assignee?.name || <span className="text-gray-400">Unassigned</span>}
+                              <div className="max-w-[100px] truncate" title={ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned'}>
+                                {ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || <span className="text-gray-400">Unassigned</span>}
                               </div>
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-700 align-middle leading-tight">
@@ -346,13 +368,9 @@ export const TicketList = () => {
                               )}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-700 align-middle">
-                              {ticket.approvedBy ? (
-                                <div className="max-w-[100px] truncate font-medium text-green-600" title={ticket.approvedBy?.name}>
-                                  {ticket.approvedBy?.name}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
+                              <div className="max-w-[80px] truncate" title={ticket.approvedBy?.name || users.find(u => (u._id || u.id) === ticket.approvedBy)?.name || '-'}>
+                                {ticket.approvedBy?.name || users.find(u => (u._id || u.id) === ticket.approvedBy)?.name || <span className="text-gray-400">-</span>}
+                              </div>
                             </td>
                             <td className="px-2 py-2 whitespace-nowrap text-right text-[10px] font-medium align-middle">
                               <Link

@@ -65,8 +65,16 @@ http.route({
 http.route({
     path: "/auth/me",
     method: "GET",
-    handler: httpAction(async (ctx) => {
+    handler: httpAction(async (ctx, request) => {
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.split(" ")[1];
         const users = await ctx.runQuery(api.users.list, {});
+
+        if (token?.includes("admin")) {
+            return jsonResponse(users.find(u => u.role === "admin") || users[0]);
+        } else if (token?.includes("technician")) {
+            return jsonResponse(users.find(u => u.role === "technician") || users[0]);
+        }
         return jsonResponse(users[0] || {});
     }),
 });
@@ -365,12 +373,16 @@ http.route({
             });
             return jsonResponse(updatedTicket);
         } else if (action === "approve") {
-            await ctx.runMutation(api.tickets.update, { id: ticket._id, status: "approved" });
+            const users = await ctx.runQuery(api.users.list, {});
+            const user = users.find(u => u.role === "admin") || users[0];
+            await ctx.runMutation(api.tickets.update, { id: ticket._id, status: "approved", approvedBy: user._id });
             const updatedTicket = await ctx.runQuery(api.tickets.getById, { id: ticket._id });
             return jsonResponse(updatedTicket);
         } else if (action === "reject") {
             const data = await request.json();
-            await ctx.runMutation(api.tickets.update, { id: ticket._id, status: "rejected" });
+            const users = await ctx.runQuery(api.users.list, {});
+            const user = users.find(u => u.role === "admin") || users[0];
+            await ctx.runMutation(api.tickets.update, { id: ticket._id, status: "rejected", approvedBy: user._id });
             // Note: we might want to store rejection reason too, but mutation needs update
             const updatedTicket = await ctx.runQuery(api.tickets.getById, { id: ticket._id });
             return jsonResponse(updatedTicket);

@@ -1,38 +1,64 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+async function hydrateTicket(ctx: any, ticket: any) {
+    if (!ticket) return null;
+    const [creator, assignee, approvedBy, category, department, organization] = await Promise.all([
+        ctx.db.get(ticket.userId),
+        ticket.assignedTo ? ctx.db.get(ticket.assignedTo) : Promise.resolve(null),
+        ticket.approvedBy ? ctx.db.get(ticket.approvedBy) : Promise.resolve(null),
+        ticket.categoryId ? ctx.db.get(ticket.categoryId) : Promise.resolve(null),
+        ticket.departmentId ? ctx.db.get(ticket.departmentId) : Promise.resolve(null),
+        ctx.db.get(ticket.organizationId),
+    ]);
+
+    return {
+        ...ticket,
+        creator,
+        assignee,
+        approvedBy: approvedBy, // Keep as object for frontend
+        // Map category object for details, but keep category name for list view compatibility if needed
+        category: category ? category.name : (typeof ticket.category === 'string' ? ticket.category : null),
+        categoryDetails: category,
+        department,
+        organization,
+    };
+}
+
 export const list = query({
     args: {
         organizationId: v.optional(v.id("organizations")),
         status: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        let q = ctx.db.query("tickets");
-        if (args.organizationId) {
-            q = q.withIndex("by_organization", (query) => query.eq("organizationId", args.organizationId!));
-        }
-        const tickets = await q.collect();
-        if (args.status) {
-            return tickets.filter(t => t.status === args.status);
-        }
-        return tickets;
+        const tickets = args.organizationId
+            ? await ctx.db.query("tickets").withIndex("by_organization", (query) => query.eq("organizationId", args.organizationId!)).collect()
+            : await ctx.db.query("tickets").collect();
+
+        const filteredTickets = args.status
+            ? tickets.filter(t => t.status === args.status)
+            : tickets;
+
+        return await Promise.all(filteredTickets.map(t => hydrateTicket(ctx, t)));
     },
 });
 
 export const getById = query({
     args: { id: v.id("tickets") },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.id);
+        const ticket = await ctx.db.get(args.id);
+        return await hydrateTicket(ctx, ticket);
     },
 });
 
 export const getByTicketId = query({
     args: { ticketId: v.string() },
     handler: async (ctx, args) => {
-        return await ctx.db
+        const ticket = await ctx.db
             .query("tickets")
             .filter((q) => q.eq(q.field("ticketId"), args.ticketId))
             .first();
+        return await hydrateTicket(ctx, ticket);
     },
 });
 
@@ -50,13 +76,16 @@ export const create = mutation({
         const ticketCount = (await ctx.db.query("tickets").collect()).length;
         const ticketId = `TICKET-${1000 + ticketCount + 1}`;
 
-        return await ctx.db.insert("tickets", {
+        const id = await ctx.db.insert("tickets", {
             ...args,
             ticketId,
             status: "open",
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });
+
+        const ticket = await ctx.db.get(id);
+        return await hydrateTicket(ctx, ticket);
     },
 });
 
@@ -65,7 +94,8 @@ export const update = mutation({
         id: v.id("tickets"),
         status: v.optional(v.string()),
         priority: v.optional(v.string()),
-        assignedTo: v.optional(v.id("users")),
+        assignedTo: v.optional(v.union(v.id("users"), v.null())),
+        approvedBy: v.optional(v.id("users")),
         dueDate: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {
@@ -74,6 +104,9 @@ export const update = mutation({
             ...updates,
             updatedAt: Date.now(),
         });
+
+        const ticket = await ctx.db.get(id);
+        return await hydrateTicket(ctx, ticket);
     },
 });
 
@@ -89,18 +122,24 @@ export const addComment = mutation({
             ...args,
             createdAt: Date.now(),
         });
-        return await ctx.db.get(args.ticketId);
+        const ticket = await ctx.db.get(args.ticketId);
+        return await hydrateTicket(ctx, ticket);
     },
 });
 
 export const getStats = query({
     args: { organizationId: v.optional(v.id("organizations")) },
     handler: async (ctx, args) => {
-        let q = ctx.db.query("tickets");
-        if (args.organizationId) {
-            q = q.withIndex("by_organization", (query) => query.eq("organizationId", args.organizationId!));
-        }
-        const tickets = await q.collect();
+        const tickets = args.organizationId
+            ? await ctx.db.query("tickets").withIndex("by_organization", (query) => query.eq("organizationId", args.organizationId!)).collect()
+            : await ctx.db.query("tickets").collect();
+
+        const hydratedRecent = await Promise.all(
+            tickets
+                .sort((a, b) => b.createdAt - a.createdAt)
+                .slice(0, 5)
+                .map(t => hydrateTicket(ctx, t))
+        );
 
         return {
             totalTickets: tickets.length,
@@ -116,7 +155,7 @@ export const getStats = query({
                 if (!t.dueDate) return false;
                 return (t.status === "open" || t.status === "in-progress") && new Date(t.dueDate) < new Date();
             }).length,
-            recentTickets: tickets.sort((a, b) => b.createdAt - a.createdAt).slice(0, 5),
+            recentTickets: hydratedRecent,
         };
     },
 });
