@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { Download, FileText } from 'lucide-react'
-import { ticketsAPI, organizationsAPI } from '../services/api'
+import { ticketsAPI, organizationsAPI, usersAPI, categoriesAPI, departmentsAPI } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -23,12 +23,16 @@ export const Reports = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [organizationFilter, setOrganizationFilter] = useState('all')
+  const [users, setUsers] = useState([])
+  const [categories, setCategories] = useState([])
+  const [departments, setDepartments] = useState([])
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      loadOrganizations()
-    }
-  }, [user])
+    loadOrganizations()
+    loadUsers()
+    loadCategories()
+    loadDepartments()
+  }, [])
 
   useEffect(() => {
     loadReportData()
@@ -37,9 +41,36 @@ export const Reports = () => {
   const loadOrganizations = async () => {
     try {
       const data = await organizationsAPI.getAll()
-      setOrganizations(data)
+      setOrganizations(data || [])
     } catch (error) {
       console.error('Failed to load organizations', error)
+    }
+  }
+
+  const loadUsers = async () => {
+    try {
+      const data = await usersAPI.getAll()
+      setUsers(data || [])
+    } catch (error) {
+      console.error('Failed to load users', error)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const data = await categoriesAPI.getAll()
+      setCategories(data || [])
+    } catch (error) {
+      console.error('Failed to load categories', error)
+    }
+  }
+
+  const loadDepartments = async () => {
+    try {
+      const data = await departmentsAPI.getAll()
+      setDepartments(data || [])
+    } catch (error) {
+      console.error('Failed to load departments', error)
     }
   }
 
@@ -120,7 +151,7 @@ export const Reports = () => {
       ticket.category,
       ticket.priority,
       ticket.status,
-      ticket.assignee?.name || 'Unassigned',
+      ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned',
       format(new Date(ticket.createdAt), 'yyyy-MM-dd HH:mm'),
       ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd HH:mm') : 'N/A',
       ticket.organization?.name || 'N/A',
@@ -154,7 +185,7 @@ export const Reports = () => {
           <td>${ticket.category}</td>
           <td>${ticket.priority}</td>
           <td>${ticket.status}</td>
-          <td>${ticket.assignee?.name || 'Unassigned'}</td>
+          <td>${ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned'}</td>
           <td>${format(new Date(ticket.createdAt), 'MMM dd, yyyy HH:mm')}</td>
           <td>${ticket.dueDate ? format(new Date(ticket.dueDate), 'MMM dd, yyyy HH:mm') : 'N/A'}</td>
         </tr>
@@ -411,7 +442,9 @@ export const Reports = () => {
                           <div className="text-[11px] font-medium text-gray-900 truncate" title={ticket.title}>{ticket.title}</div>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{ticket.category || '—'}</span>
+                          <span className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {ticket.categoryDetails?.name || categories.find(c => (c._id || c.id) === ticket.categoryId)?.name || ticket.category || '—'}
+                          </span>
                         </td>
                         <td className="px-2 py-2 whitespace-nowrap text-center">
                           <div className="flex justify-center scale-75 origin-center">
@@ -427,8 +460,8 @@ export const Reports = () => {
                             </Badge>
                           </div>
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-900 truncate max-w-[100px]" title={ticket.assignee?.name}>
-                          {ticket.assignee?.name || <span className="text-gray-400">Unassigned</span>}
+                        <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-900 truncate max-w-[100px]" title={ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || 'Unassigned'}>
+                          {ticket.assignee?.name || users.find(u => (u._id || u.id) === ticket.assignedTo)?.name || ticket.assignedTo || <span className="text-gray-400">Unassigned</span>}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-700 leading-tight">
                           <div className="font-medium">{format(new Date(ticket.createdAt), 'MMM dd')}</div>
