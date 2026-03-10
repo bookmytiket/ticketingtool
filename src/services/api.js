@@ -7,7 +7,7 @@ const getAuthToken = () => {
 }
 
 // Helper function for API calls
-const apiCall = async (endpoint, options = {}) => {
+const apiCall = async (endpoint, options = {}, timeoutMs = 15000) => {
   const token = getAuthToken()
   const headers = {
     'Content-Type': 'application/json',
@@ -18,11 +18,16 @@ const apiCall = async (endpoint, options = {}) => {
     headers.Authorization = `Bearer ${token}`
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       // Handle 401 Unauthorized - token expired or invalid
@@ -44,6 +49,11 @@ const apiCall = async (endpoint, options = {}) => {
 
     return response.json()
   } catch (error) {
+    clearTimeout(timeoutId)
+    // Handle request timeout (AbortError)
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. The server is taking too long to respond.')
+    }
     // Handle network errors (fetch failures)
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('Network error: Unable to connect to server. Please check your connection and try again.')

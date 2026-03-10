@@ -31,8 +31,13 @@ export const DepartmentHeadDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const data = await ticketsAPI.getDashboardStats()
-      
+
+      // Run both API calls in parallel instead of sequentially
+      const [data, allTickets] = await Promise.all([
+        ticketsAPI.getDashboardStats(),
+        ticketsAPI.getAll({ status: 'approval-pending' }),
+      ])
+
       setStats({
         totalTickets: data.totalTickets || 0,
         openTickets: data.openTickets || 0,
@@ -44,18 +49,12 @@ export const DepartmentHeadDashboard = () => {
         closedTickets: data.closedTickets || 0,
       })
 
-      // Load pending tickets for approval - filter by approval-pending status
-      const allTickets = await ticketsAPI.getAll({ status: 'approval-pending' })
-      console.log('Approval pending tickets found:', allTickets.length, allTickets) // Debug log
-      
       // Filter tickets that have a department (department heads only see tickets from their department)
       const ticketsWithDepartment = allTickets.filter(ticket => ticket.department)
-      console.log('Tickets with department:', ticketsWithDepartment.length) // Debug log
-      
       setPendingTickets(ticketsWithDepartment.slice(0, 10))
     } catch (error) {
       console.error('Dashboard data error:', error)
-      toast.error('Failed to load dashboard data')
+      toast.error('Failed to load dashboard data: ' + (error.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
@@ -83,7 +82,7 @@ export const DepartmentHeadDashboard = () => {
     }
     const reason = window.prompt('Please provide a reason for rejection:')
     if (reason === null) return // User cancelled
-    
+
     if (!reason.trim()) {
       toast.error('Rejection reason is required')
       return
@@ -100,67 +99,67 @@ export const DepartmentHeadDashboard = () => {
   }
 
   const statsData = [
-    { 
-      label: 'Total Tickets', 
-      value: stats.totalTickets.toLocaleString(), 
-      icon: Ticket, 
-      color: 'text-primary-600', 
+    {
+      label: 'Total Tickets',
+      value: stats.totalTickets.toLocaleString(),
+      icon: Ticket,
+      color: 'text-primary-600',
       bgGradient: 'from-primary-50 to-primary-100/50',
       iconBg: 'bg-gradient-to-br from-primary-500 to-primary-600',
     },
-    { 
-      label: 'Open', 
-      value: (stats.openTickets || 0).toLocaleString(), 
-      icon: Ticket, 
-      color: 'text-blue-600', 
+    {
+      label: 'Open',
+      value: (stats.openTickets || 0).toLocaleString(),
+      icon: Ticket,
+      color: 'text-blue-600',
       bgGradient: 'from-blue-50 to-blue-100/50',
       iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
     },
-    { 
-      label: 'Approval Pending', 
-      value: stats.approvalPendingTickets.toLocaleString(), 
-      icon: Clock, 
-      color: 'text-orange-600', 
+    {
+      label: 'Approval Pending',
+      value: stats.approvalPendingTickets.toLocaleString(),
+      icon: Clock,
+      color: 'text-orange-600',
       bgGradient: 'from-orange-50 to-orange-100/50',
       iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600',
     },
-    { 
-      label: 'Approved', 
-      value: stats.approvedTickets.toLocaleString(), 
-      icon: CheckCircle, 
-      color: 'text-green-600', 
+    {
+      label: 'Approved',
+      value: stats.approvedTickets.toLocaleString(),
+      icon: CheckCircle,
+      color: 'text-green-600',
       bgGradient: 'from-green-50 to-green-100/50',
       iconBg: 'bg-gradient-to-br from-green-500 to-green-600',
     },
-    { 
-      label: 'Rejected', 
-      value: (stats.rejectedTickets || 0).toLocaleString(), 
-      icon: AlertCircle, 
-      color: 'text-red-600', 
+    {
+      label: 'Rejected',
+      value: (stats.rejectedTickets || 0).toLocaleString(),
+      icon: AlertCircle,
+      color: 'text-red-600',
       bgGradient: 'from-red-50 to-red-100/50',
       iconBg: 'bg-gradient-to-br from-red-500 to-red-600',
     },
-    { 
-      label: 'In Progress', 
-      value: (stats.inProgressTickets || 0).toLocaleString(), 
-      icon: Clock, 
-      color: 'text-yellow-600', 
+    {
+      label: 'In Progress',
+      value: (stats.inProgressTickets || 0).toLocaleString(),
+      icon: Clock,
+      color: 'text-yellow-600',
       bgGradient: 'from-yellow-50 to-yellow-100/50',
       iconBg: 'bg-gradient-to-br from-yellow-500 to-yellow-600',
     },
-    { 
-      label: 'Resolved', 
-      value: stats.resolvedTickets.toLocaleString(), 
-      icon: CheckSquare, 
-      color: 'text-emerald-600', 
+    {
+      label: 'Resolved',
+      value: stats.resolvedTickets.toLocaleString(),
+      icon: CheckSquare,
+      color: 'text-emerald-600',
       bgGradient: 'from-emerald-50 to-emerald-100/50',
       iconBg: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
     },
-    { 
-      label: 'Closed', 
-      value: stats.closedTickets.toLocaleString(), 
-      icon: XCircle, 
-      color: 'text-gray-600', 
+    {
+      label: 'Closed',
+      value: stats.closedTickets.toLocaleString(),
+      icon: XCircle,
+      color: 'text-gray-600',
       bgGradient: 'from-gray-50 to-gray-100/50',
       iconBg: 'bg-gradient-to-br from-gray-500 to-gray-600',
     },
@@ -203,7 +202,7 @@ export const DepartmentHeadDashboard = () => {
               {statsData.map((stat, index) => {
                 const Icon = stat.icon
                 return (
-                  <Card 
+                  <Card
                     key={stat.label}
                     className="p-6 animate-slide-down"
                     style={{ animationDelay: `${index * 0.1}s` }}
@@ -267,7 +266,7 @@ export const DepartmentHeadDashboard = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pendingTickets.map((ticket, index) => (
-                        <tr 
+                        <tr
                           key={ticket._id}
                           className="hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent transition-all duration-300"
                         >
@@ -276,10 +275,10 @@ export const DepartmentHeadDashboard = () => {
                             <div className="text-sm text-gray-500">{ticket.title}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge 
+                            <Badge
                               variant={
                                 ticket.priority === 'urgent' || ticket.priority === 'high' ? 'danger' :
-                                ticket.priority === 'medium' ? 'warning' : 'info'
+                                  ticket.priority === 'medium' ? 'warning' : 'info'
                               }
                             >
                               {ticket.priority}

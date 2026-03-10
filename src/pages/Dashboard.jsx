@@ -68,14 +68,13 @@ export const Dashboard = () => {
   const [approvalPendingTickets, setApprovalPendingTickets] = useState([])
 
   useEffect(() => {
-    if (isAdmin) {
-      loadOrganizations()
-    }
-    if (isAdmin || isDepartmentHead) {
-      loadDepartments()
-    }
-    loadDashboardData()
-  }, [selectedOrganization, selectedDepartment, user, isAdmin, isDepartmentHead, isAgentOrTechnician])
+    if (!user) return
+    // Run all side-loading in parallel so they don't block each other
+    const fetchPromises = [loadDashboardData()]
+    if (isAdmin) fetchPromises.push(loadOrganizations())
+    if (isAdmin || isDepartmentHead) fetchPromises.push(loadDepartments())
+    Promise.all(fetchPromises)
+  }, [selectedOrganization, selectedDepartment, user?.role, user?._id])
 
   const loadOrganizations = async () => {
     try {
@@ -100,57 +99,34 @@ export const Dashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const data = await ticketsAPI.getDashboardStats(selectedOrganization)
 
-      // Load approval pending tickets for department heads
-      if (isDepartmentHead) {
-        try {
-          // Get approval pending tickets - backend will automatically filter by department
-          const pendingTickets = await ticketsAPI.getAll({ status: 'approval-pending' })
-          console.log('Department Head - Approval pending tickets loaded:', pendingTickets?.length || 0)
-          console.log('Department Head - User department:', user?.department?._id || user?.department || 'None')
-          console.log('Department Head - Tickets details:', pendingTickets?.map(t => ({
-            id: t.ticketId,
-            title: t.title,
-            status: t.status,
-            department: t.department?._id || t.department || 'None',
-            departmentName: t.department?.name || 'None'
-          })))
+      // --- PARALLEL FETCH: run all needed requests at the same time ---
+      const fetchDashboard = ticketsAPI.getDashboardStats(selectedOrganization)
 
-          // Backend already filters by department and organization, so just use the tickets as-is
-          // But verify they have the correct status for safety
-          const validPendingTickets = Array.isArray(pendingTickets)
-            ? pendingTickets.filter(ticket => {
-              const isValid = ticket.status === 'approval-pending'
+      // For dept heads, fetch pending-approval tickets at the same time as dashboard stats
+      const fetchPending = isDepartmentHead
+        ? ticketsAPI.getAll({ status: 'approval-pending' })
+        : Promise.resolve(null)
 
-              // Log for debugging
-              if (!isValid) {
-                console.log('Department Head - Ticket filtered out (wrong status):', {
-                  ticketId: ticket.ticketId,
-                  status: ticket.status,
-                  expected: 'approval-pending'
-                })
-              }
+      // Fetch all tickets to compute status and priority distributions frontend-side
+      const fetchAllTickets = user?._id
+        ? ticketsAPI.getAll()
+        : Promise.resolve(null)
 
-              return isValid
-            })
-            : []
+      // Fire everything in parallel
+      const [data, pendingTickets, allMyTickets] = await Promise.all([
+        fetchDashboard,
+        fetchPending,
+        fetchAllTickets,
+      ])
+      // ---------------------------------------------------------------
 
-          console.log('Department Head - Final approval pending tickets:', validPendingTickets.length, validPendingTickets.map(t => ({
-            id: t.ticketId,
-            title: t.title,
-            status: t.status,
-            department: t.department?._id?.toString() || t.department?.toString() || 'None',
-            organization: t.organization?._id?.toString() || t.organization?.toString() || 'None'
-          })))
-
-          console.log('Department Head - Valid approval pending tickets after filtering:', validPendingTickets.length)
-          setApprovalPendingTickets(validPendingTickets)
-        } catch (error) {
-          console.error('Failed to load approval pending tickets', error)
-          toast.error('Failed to load approval pending tickets: ' + (error.message || 'Unknown error'))
-          setApprovalPendingTickets([])
-        }
+      // Handle approval pending tickets for department heads
+      if (isDepartmentHead && pendingTickets) {
+        const validPendingTickets = Array.isArray(pendingTickets)
+          ? pendingTickets.filter(ticket => ticket.status === 'approval-pending')
+          : []
+        setApprovalPendingTickets(validPendingTickets)
       }
 
       // For department heads, show department stats
@@ -169,53 +145,60 @@ export const Dashboard = () => {
         })
         setRecentTickets(data.recentTickets || [])
         setMyOpenTickets(data.myOpenTickets || [])
-        setStatusData(data.statusDistribution || [])
-        const totalPriorityTickets = (data.priorityDistribution || []).reduce((sum, item) => sum + item.value, 0)
-        const priorityWithPercentages = (data.priorityDistribution || []).map(item => ({
-          ...item,
-          percentage: totalPriorityTickets > 0 ? Math.round((item.value / totalPriorityTickets) * 100) : 0
+        const dhTickets = allMyTickets || []
+
+        const statusCounts = {}
+        dhTickets.forEach(ticket => {
+          statusCounts[ticket.status] = (statusCounts[ticket.status] || 0) + 1
+        })
+        setStatusData(Object.entries(statusCounts).map(([name, value]) => ({ name, value })))
+
+        const priorityCounts = {}
+        dhTickets.forEach(ticket => {
+          priorityCounts[ticket.priority] = (priorityCounts[ticket.priority] || 0) + 1
+        })
+        const totalPriorityTickets = Object.values(priorityCounts).reduce((sum, val) => sum + val, 0)
+        const priorityWithPercentages = Object.entries(priorityCounts).map(([name, value]) => ({
+          name,
+          value,
+          percentage: totalPriorityTickets > 0 ? Math.round((value / totalPriorityTickets) * 100) : 0
         }))
         setPriorityData(priorityWithPercentages)
       } else if (isAgentOrTechnician) {
-        // For technicians: show ONLY tickets assigned to them (backend already filters)
+        // For technicians: show ONLY tickets assigned to them
         const myOpenTicketsList = data.myOpenTickets || []
+        const tickets = allMyTickets || []
 
-        // Get all tickets assigned to technician (backend filters by assignee)
-        const allMyTickets = await ticketsAPI.getAll()
-
-        // Calculate stats for technician tickets (only assigned tickets)
         const myStats = {
-          totalTickets: allMyTickets.length || 0,
-          openTickets: allMyTickets.filter(t => t.status === 'open').length || 0,
-          approvalPendingTickets: allMyTickets.filter(t => t.status === 'approval-pending').length || 0,
-          approvedTickets: allMyTickets.filter(t => t.status === 'approved').length || 0,
-          rejectedTickets: allMyTickets.filter(t => t.status === 'rejected').length || 0,
-          inProgressTickets: allMyTickets.filter(t => t.status === 'in-progress').length || 0,
-          resolvedTickets: allMyTickets.filter(t => t.status === 'resolved').length || 0,
-          closedTickets: allMyTickets.filter(t => t.status === 'closed').length || 0,
-          pendingTickets: allMyTickets.filter(t => t.status === 'open' || t.status === 'in-progress').length || 0,
-          overdueTickets: allMyTickets.filter(t => {
+          totalTickets: tickets.length,
+          openTickets: tickets.filter(t => t.status === 'open').length,
+          approvalPendingTickets: tickets.filter(t => t.status === 'approval-pending').length,
+          approvedTickets: tickets.filter(t => t.status === 'approved').length,
+          rejectedTickets: tickets.filter(t => t.status === 'rejected').length,
+          inProgressTickets: tickets.filter(t => t.status === 'in-progress').length,
+          resolvedTickets: tickets.filter(t => t.status === 'resolved').length,
+          closedTickets: tickets.filter(t => t.status === 'closed').length,
+          pendingTickets: tickets.filter(t => t.status === 'open' || t.status === 'in-progress').length,
+          overdueTickets: tickets.filter(t => {
             if (!t.dueDate) return false
             const due = new Date(t.dueDate)
             const now = new Date()
             return (t.status === 'open' || t.status === 'in-progress') && due < now
-          }).length || 0,
+          }).length,
         }
 
         setStats(myStats)
         setMyOpenTickets(myOpenTicketsList)
         setRecentTickets(data.recentTickets || [])
 
-        // Status distribution for technician tickets (only assigned tickets)
         const statusCounts = {}
-        allMyTickets.forEach(ticket => {
+        tickets.forEach(ticket => {
           statusCounts[ticket.status] = (statusCounts[ticket.status] || 0) + 1
         })
         setStatusData(Object.entries(statusCounts).map(([name, value]) => ({ name, value })))
 
-        // Priority distribution for technician tickets (only assigned tickets)
         const priorityCounts = {}
-        allMyTickets.forEach(ticket => {
+        tickets.forEach(ticket => {
           priorityCounts[ticket.priority] = (priorityCounts[ticket.priority] || 0) + 1
         })
         const totalPriorityTickets = Object.values(priorityCounts).reduce((sum, val) => sum + val, 0)
@@ -226,33 +209,23 @@ export const Dashboard = () => {
         }))
         setPriorityData(priorityWithPercentages)
       } else if (!isAdmin && !isAgentOrTechnician) {
-        // For regular users, only show recently created tickets
-        // Get all user's tickets sorted by creation date (most recent first)
-        const allMyTickets = await ticketsAPI.getAll()
-
-        // Sort by creation date descending (most recent first) and limit to recent tickets
-        const recentTicketsList = allMyTickets
+        // For regular users, show recent tickets sorted by date
+        const tickets = allMyTickets || []
+        const recentTicketsList = tickets
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 20) // Show last 20 tickets
+          .slice(0, 20)
 
         setStats({
-          totalTickets: 0,
-          openTickets: 0,
-          approvalPendingTickets: 0,
-          approvedTickets: 0,
-          rejectedTickets: 0,
-          inProgressTickets: 0,
-          resolvedTickets: 0,
-          closedTickets: 0,
-          pendingTickets: 0,
-          overdueTickets: 0,
-        }) // Set default stats for regular users (not used but prevents errors)
-        setMyOpenTickets([]) // Don't show my open tickets section
-        setRecentTickets(recentTicketsList) // Show recent tickets
-        setStatusData([]) // No charts for regular users
-        setPriorityData([]) // No charts for regular users
+          totalTickets: 0, openTickets: 0, approvalPendingTickets: 0,
+          approvedTickets: 0, rejectedTickets: 0, inProgressTickets: 0,
+          resolvedTickets: 0, closedTickets: 0, pendingTickets: 0, overdueTickets: 0,
+        })
+        setMyOpenTickets([])
+        setRecentTickets(recentTicketsList)
+        setStatusData([])
+        setPriorityData([])
       } else {
-        // Admin/Technician view - show all data
+        // Admin view - show all data
         setStats({
           totalTickets: data.totalTickets || 0,
           openTickets: data.openTickets || 0,
@@ -272,30 +245,35 @@ export const Dashboard = () => {
           const openFromRecent = data.recentTickets.filter(t =>
             t.status === 'open' || t.status === 'in-progress'
           )
-          if (openFromRecent.length > 0) {
-            openTicketsToShow = openFromRecent
-          }
+          if (openFromRecent.length > 0) openTicketsToShow = openFromRecent
         }
 
         setMyOpenTickets(openTicketsToShow)
-        setStatusData(data.statusDistribution || [])
 
-        const totalPriorityTickets = (data.priorityDistribution || []).reduce((sum, item) => sum + item.value, 0)
-        const priorityWithPercentages = (data.priorityDistribution || []).map(item => ({
-          ...item,
-          percentage: totalPriorityTickets > 0 ? Math.round((item.value / totalPriorityTickets) * 100) : 0
+        const adminTickets = allMyTickets || []
+
+        const statusCounts = {}
+        adminTickets.forEach(ticket => {
+          statusCounts[ticket.status] = (statusCounts[ticket.status] || 0) + 1
+        })
+        setStatusData(Object.entries(statusCounts).map(([name, value]) => ({ name, value })))
+
+        const priorityCounts = {}
+        adminTickets.forEach(ticket => {
+          priorityCounts[ticket.priority] = (priorityCounts[ticket.priority] || 0) + 1
+        })
+        const totalPriorityTickets = Object.values(priorityCounts).reduce((sum, val) => sum + val, 0)
+        const priorityWithPercentages = Object.entries(priorityCounts).map(([name, value]) => ({
+          name,
+          value,
+          percentage: totalPriorityTickets > 0 ? Math.round((value / totalPriorityTickets) * 100) : 0
         }))
         setPriorityData(priorityWithPercentages)
       }
     } catch (error) {
       console.error('Dashboard data error:', error)
-      toast.error('Failed to load dashboard data. Showing default view.')
-      setStats({
-        totalTickets: 0,
-        pendingTickets: 0,
-        closedTickets: 0,
-        overdueTickets: 0,
-      })
+      toast.error('Failed to load dashboard data: ' + (error.message || 'Unknown error'))
+      setStats({ totalTickets: 0, pendingTickets: 0, closedTickets: 0, overdueTickets: 0 })
       setRecentTickets([])
       setMyOpenTickets([])
       setStatusData([])

@@ -324,42 +324,7 @@ export const Login = () => {
                   )}
                 </span>
               </button>
-              {/* Demo Credentials */}
-              <div className="mt-8 pt-6 border-t border-dashed" style={{ borderColor: borderColor }}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-4 opacity-50" style={{ color: textColor }}>
-                  Demo Access Credentials
-                </p>
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { role: 'Admin', email: 'admin@demo.com', pass: 'admin123' },
-                    { role: 'Technician', email: 'tech@demo.com', pass: 'tech123' },
-                    { role: 'User', email: 'user@demo.com', pass: 'user123' }
-                  ].map((demo) => (
-                    <div
-                      key={demo.role}
-                      onClick={() => {
-                        setEmail(demo.email)
-                        setPassword(demo.pass)
-                        playClick()
-                      }}
-                      className="flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.01)',
-                        borderColor: borderColor
-                      }}
-                    >
-                      <div>
-                        <span className="text-[10px] font-bold uppercase block opacity-60" style={{ color: textColor }}>{demo.role}</span>
-                        <span className="text-xs font-medium" style={{ color: textColor }}>{demo.email}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold uppercase block opacity-60" style={{ color: textColor }}>Pass</span>
-                        <span className="text-xs font-mono" style={{ color: textColor }}>{demo.pass}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+
             </form>
 
             {/* SSO Options */}
