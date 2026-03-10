@@ -1,15 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { 
-  LayoutDashboard, 
-  Ticket, 
-  Settings, 
-  Users, 
+import {
+  LayoutDashboard,
+  Ticket,
+  Settings,
+  Users,
   Shield,
   Mail,
   User,
   LogOut,
-  Image as ImageIcon,
   Building2,
   Tag,
   X,
@@ -18,11 +17,9 @@ import {
   Briefcase,
   Upload,
   BarChart3,
-  Key,
   MessageSquare,
   Send,
   HelpCircle,
-  Database,
   FileCode,
   Hash,
   Hash as HashIcon,
@@ -30,7 +27,6 @@ import {
   XCircle,
   Info,
   Edit3,
-  Plug
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLogo } from '../../contexts/LogoContext'
@@ -44,14 +40,14 @@ const getMenuItems = (userRole) => {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/tickets', icon: Ticket, label: 'Tickets' },
   ]
-  
+
   // Only show Reports for admins and agents
   if (userRole === 'admin' || userRole === 'technician') {
     items.push({ path: '/reports', icon: FileText, label: 'Reports' })
   }
-  
+
   items.push({ path: '/settings', icon: Settings, label: 'Settings' })
-  
+
   return items
 }
 
@@ -64,18 +60,11 @@ const adminMenuItems = [
   { path: '/admin/sla', icon: Clock, label: 'SLA Policies' },
   { path: '/admin/tickets/import', icon: Upload, label: 'Import Tickets' },
   { path: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
-  { path: '/admin/api-keys', icon: Key, label: 'API Keys' },
-  { path: '/admin/integrations', icon: Plug, label: 'External Integrations' },
   { path: '/admin/email', icon: Mail, label: 'Email Settings' },
-  { path: '/admin/domain-rules', icon: Shield, label: 'Domain Rules' },
   { path: '/admin/email-templates', icon: FileCode, label: 'Email Templates' },
   { path: '/admin/email-automation', icon: Send, label: 'Email Automation' },
   { path: '/admin/faq', icon: HelpCircle, label: 'FAQ Management' },
   { path: '/admin/chat-history', icon: MessageSquare, label: 'Chat History' },
-  { path: '/admin/teams-integration', icon: MessageSquare, label: 'Microsoft Teams' },
-  { path: '/admin/sso', icon: Shield, label: 'SSO Configuration' },
-  { path: '/admin/logo', icon: ImageIcon, label: 'Logo Management' },
-  { path: '/admin/backup-restore', icon: Database, label: 'Backup & Restore' },
 ]
 
 const NavItem = ({ item, onClick }) => {
@@ -87,14 +76,13 @@ const NavItem = ({ item, onClick }) => {
     <NavLink
       to={item.path}
       onClick={onClick}
-      className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 relative group ${
-        isActive 
-          ? 'bg-gradient-to-r from-primary-500/20 via-primary-500/15 to-primary-500/10 text-primary-700 font-semibold backdrop-blur-md border border-primary-500/30 shadow-lg shadow-primary-500/20' 
-          : 'text-gray-700 hover:bg-white/40 hover:backdrop-blur-md hover:text-gray-900 hover:border hover:border-white/30 hover:shadow-md'
-      }`}
+      className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 relative group ${isActive
+        ? 'bg-gradient-to-r from-primary-500/20 via-primary-500/15 to-primary-500/10 text-primary-700 font-semibold backdrop-blur-md border border-primary-500/30 shadow-lg shadow-primary-500/20'
+        : 'text-gray-700 hover:bg-white/40 hover:backdrop-blur-md hover:text-gray-900 hover:border hover:border-white/30 hover:shadow-md'
+        }`}
       style={{
-        backgroundColor: isActive 
-          ? 'rgba(14, 165, 233, 0.15)' 
+        backgroundColor: isActive
+          ? 'rgba(14, 165, 233, 0.15)'
           : 'transparent',
       }}
     >
@@ -142,7 +130,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
     <>
       {/* Mobile overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-20 lg:hidden transition-opacity"
           onClick={onClose}
         />
@@ -150,9 +138,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
       {/* Sidebar with transparent glass effect */}
       <aside
-        className={`fixed top-0 left-0 z-30 h-full w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 z-30 h-full w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
         style={{
           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.5) 100%)',
           backdropFilter: 'blur(20px) saturate(180%)',
@@ -163,7 +150,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
       >
         <div className="flex flex-col h-full">
           {/* Logo Header with transparent effect */}
-          <div 
+          <div
             className="flex items-center justify-between h-16 px-6 border-b"
             style={{
               borderColor: 'rgba(0, 0, 0, 0.08)',
@@ -171,16 +158,16 @@ export const Sidebar = ({ isOpen, onClose }) => {
             }}
           >
             <div className="flex items-center space-x-3">
-              <div 
+              <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
                 style={{
                   background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.8) 0%, rgba(2, 132, 199, 0.9) 100%)',
                   boxShadow: '0 4px 15px rgba(14, 165, 233, 0.3)',
                 }}
               >
-                <img 
-                  src={logo} 
-                  alt="Logo" 
+                <img
+                  src={logo}
+                  alt="Logo"
                   className="h-8 w-auto"
                   onError={(e) => {
                     e.target.src = '/logo.svg'
@@ -199,15 +186,15 @@ export const Sidebar = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-                {/* Navigation */}
-                <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                  {getMenuItems(user?.role).map((item) => (
-                    <NavItem
-                      key={item.path}
-                      item={item}
-                      onClick={() => window.innerWidth < 1024 && onClose()}
-                    />
-                  ))}
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            {getMenuItems(user?.role).map((item) => (
+              <NavItem
+                key={item.path}
+                item={item}
+                onClick={() => window.innerWidth < 1024 && onClose()}
+              />
+            ))}
 
             {isAdmin && (
               <>
@@ -228,7 +215,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           </nav>
 
           {/* User section with transparent effect */}
-          <div 
+          <div
             className="p-4 border-t"
             style={{
               borderColor: 'rgba(0, 0, 0, 0.08)',
@@ -299,7 +286,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 Leave empty to use auto-increment from the highest existing ticket ID.
               </p>
             </div>
-            
+
             <Input
               label={
                 <div className="flex items-center gap-2">
